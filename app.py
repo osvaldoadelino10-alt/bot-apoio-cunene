@@ -2,7 +2,7 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import datetime
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 reportes = []
 user_states = {}
