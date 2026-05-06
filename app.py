@@ -3,7 +3,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from datetime import datetime
 import json
 
-app = Flask(_name_)
+app = Flask(__name__)
 
 # Base de dados simples em memória - pra demonstração
 REPORTS = []
