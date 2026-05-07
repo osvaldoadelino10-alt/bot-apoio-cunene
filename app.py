@@ -42,7 +42,7 @@ Província: Cunene
 🏥 SAUDE - Postos médicos, medicamentos  
 🏫 ESCOLA - Educação, infraestrutura
 ⚠️ URGENTE - Emergências
-📊 STATS - Ver estatísticas
+📊 STATS - Ver estatísticas.
 
 Digite a palavra da categoria"""
         msg.body(menu)
