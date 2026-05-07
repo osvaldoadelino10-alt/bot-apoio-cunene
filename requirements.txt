@@ -2,3 +2,4 @@ Flask==3.0.3
 twilio==9.3.0
 Gunicorn==22.0.0
 google-generativeai==0.7.2
+protobuf==4.25.3
