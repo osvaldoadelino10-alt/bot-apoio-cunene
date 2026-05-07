@@ -1,93 +1,68 @@
+import os
+import sqlite3
+import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import datetime
+import google.generativeai as genai
 
 app = Flask(__name__)
 
-reportes = []
-user_states = {}
+# PEGA A CHAVE QUE TU SALVOU NO RENDER
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+def criar_banco():
+    conn = sqlite3.connect('cunene.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS reportes
+                 (id INTEGER PRIMARY KEY, categoria TEXT, bairro TEXT, resumo TEXT, telefone TEXT, data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    conn.commit()
+    conn.close()
+
+criar_banco()
+
+def entender_mensagem(texto):
+    prompt = f"""Você é o Cunene Conectado. Analise e retorne SÓ JSON.
+    Categorias: AGUA, SAUDE, ESCOLA, URGENTE, PERGUNTA, OUTRO
+    Se for oi, ola, tudo bem, retorne categoria PERGUNTA e resumo saudacao.
+    Bairros: Naipalala, Central, Ondjiva, Namacunde.
+    Mensagem: "{texto}"
+    JSON:"""
+    try:
+        resposta = model.generate_content(prompt)
+        return eval(resposta.text)
+    except:
+        return {"categoria": "OUTRO", "bairro": None, "resumo": texto}
+
+def salvar_reporte(dados, telefone):
+    conn = sqlite3.connect('cunene.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO reportes (categoria, bairro, resumo, telefone) VALUES (?, ?, ?, ?)",
+              (dados['categoria'], dados['bairro'], dados['resumo'], telefone))
+    conn.commit()
+    conn.close()
 
 @app.route("/webhook", methods=['POST'])
 def webhook():
-    incoming_msg = request.values.get('Body', '').strip().lower()
+    texto = request.values.get('Body', '')
     from_number = request.values.get('From', '')
-    
     resp = MessagingResponse()
     msg = resp.message()
-    
-    print(f"Recebi: {incoming_msg} de {from_number}") # Pra aparecer no log
-    
-    # Se usuário tá respondendo um estado anterior
-    if from_number in user_states:
-        estado = user_states[from_number]
-        reportes.append({
-            "categoria": estado.replace('aguardando_detalhes_','').upper(),
-            "mensagem": request.values.get('Body', '').strip(),
-            "telefone": from_number,
-            "data": str(datetime.datetime.now())
-        })
-        del user_states[from_number]
-        msg.body("✅ REGISTO CONCLUÍDO!*\n\nObrigado. A sua ocorrência foi registrada com sucesso.\n\nDigite *MENU para novo reporte.")
+
+    dados = entender_mensagem(texto)
+
+    if dados['categoria'] == "PERGUNTA" and dados['resumo'] == "saudacao":
+        msg.body("🤖 Olá! Tudo bem por aqui 😊\n\nSou o Cunene Conectado. Me fala o problema e o bairro.\nEx: 'Falta água no Naipalala'")
         return str(resp)
-    
-    # Comandos principais
-    if incoming_msg == 'menu':
-        menu = """🇦🇴 BOT CUNENE - APOIO AO CIDADÃO 🇦🇴
 
-Sistema de reporte para problemas comunitários
-Província: Cunene
+    if dados['categoria'] in ['AGUA', 'SAUDE', 'ESCOLA', 'URGENTE']:
+        salvar_reporte(dados, from_number)
+        msg.body(f"✅ Registo feito!\nCategoria: {dados['categoria']}\nBairro: {dados['bairro'] or 'Não informado'}\n\nObrigado!")
+        return str(resp)
 
-📋 CATEGORIAS:
-🚰 AGUA - Falta de água, poços avariados
-🏥 SAUDE - Postos médicos, medicamentos  
-🏫 ESCOLA - Educação, infraestrutura
-⚠️ URGENTE - Emergências
-📊 STATS - Ver estatísticas.
-
-Digite a palavra da categoria"""
-        msg.body(menu)
-    
-    elif incoming_msg == 'agua':
-        user_states[from_number] = 'aguardando_detalhes_agua'
-        msg.body("🚰 *REGISTO - ÁGUA*\n\nDescreva o problema de água no Cunene:")
-    
-    elif incoming_msg == 'saude':
-        user_states[from_number] = 'aguardando_detalhes_saude'
-        msg.body("🏥 *REGISTO - SAÚDE*\n\nDescreva o problema de saúde:")
-    
-    elif incoming_msg == 'escola':
-        user_states[from_number] = 'aguardando_detalhes_escola'
-        msg.body("🏫 *REGISTO - ESCOLA*\n\nDescreva o problema na escola:")
-    
-    elif incoming_msg == 'urgente':
-        user_states[from_number] = 'aguardando_detalhes_urgente'
-        msg.body("⚠️ *REGISTO - URGENTE*\n\nDescreva a emergência:")
-    
-    elif incoming_msg == 'stats':
-        total = len(reportes)
-        msg.body(f"📊 ESTATÍSTICAS CUNENE*\n\nTotal de reportes: {total}\n\nDigite *MENU para voltar")
-    
-    else:
-        msg.body("Olá! 👋\n\nDigite MENU para ver as opções do Bot Apoio Cunene 🇦🇴")
-    
-    print(f"Respondendo: {msg.body}") # Pra aparecer no log
+    msg.body("Não entendi. Tenta assim:\n'Falta água no bairro Central'")
     return str(resp)
 
-@app.route("/dashboard")
-def dashboard():
-    return {
-        "ano": 2026,
-        "autor": "Osvaldo",
-        "projeto": "Bot Apoio Cunene",
-        "total_reportes": len(reportes),
-        "estatisticas": {
-            "AGUA": len([r for r in reportes if r["categoria"] == "AGUA"]),
-            "SAUDE": len([r for r in reportes if r["categoria"] == "SAUDE"]),
-            "ESCOLA": len([r for r in reportes if r["categoria"] == "ESCOLA"]),
-            "URGENTE": len([r for r in reportes if r["categoria"] == "URGENTE"])
-        },
-        "ultimos_reportes": reportes[-5:]
-    }
-if __name__ == "__main__":
-    app.run()
+    if __name__ "__main__":
+        app.run(debug=True)
 
