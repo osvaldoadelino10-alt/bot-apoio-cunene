@@ -63,6 +63,6 @@ def webhook():
     msg.body("Não entendi. Tenta assim:\n'Falta água no bairro Central'")
     return str(resp)
 
-    if __name__ "__main__":
+    if __name__ == "__main__":
         app.run(debug=True)
 
