@@ -1,68 +1,53 @@
 import os
-import sqlite3
-import requests
 from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
-import google.generativeai as genai
+from google import genai
+import logging
 
 app = Flask(__name__)
 
-# PEGA A CHAVE QUE TU SALVOU NO RENDER
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- CONFIGURAÇÕES ---
+# No Render, configure estas chaves nas 'Environment Variables'
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'SUA_CHAVE_AQUI_SE_TESTAR_LOCAL')
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-def criar_banco():
-    conn = sqlite3.connect('cunene.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS reportes
-                 (id INTEGER PRIMARY KEY, categoria TEXT, bairro TEXT, resumo TEXT, telefone TEXT, data TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    conn.commit()
-    conn.close()
+logging.basicConfig(level=logging.INFO)
 
-criar_banco()
-
-def entender_mensagem(texto):
-    prompt = f"""Você é o Cunene Conectado. Analise e retorne SÓ JSON.
-    Categorias: AGUA, SAUDE, ESCOLA, URGENTE, PERGUNTA, OUTRO
-    Se for oi, ola, tudo bem, retorne categoria PERGUNTA e resumo saudacao.
-    Bairros: Naipalala, Central, Ondjiva, Namacunde.
-    Mensagem: "{texto}"
-    JSON:"""
+def perguntar_ao_gemini(mensagem):
     try:
-        resposta = model.generate_content(prompt)
-        return eval(resposta.text)
-    except:
-        return {"categoria": "OUTRO", "bairro": None, "resumo": texto}
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=mensagem,
+            config={
+                'system_instruction': (
+                    "Você é o Assistente Comunitário do Cunene. "
+                    "Apoie a população de Ondjiva e arredores com informações úteis. "
+                    "Seja direto, educado e use termos locais de Angola."
+                )
+            }
+        )
+        return response.text
+    except Exception as e:
+        logging.error(f"Erro na IA: {e}")
+        return "Lamento, estou com uma falha técnica agora. Tente mais tarde."
 
-def salvar_reporte(dados, telefone):
-    conn = sqlite3.connect('cunene.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO reportes (categoria, bairro, resumo, telefone) VALUES (?, ?, ?, ?)",
-              (dados['categoria'], dados['bairro'], dados['resumo'], telefone))
-    conn.commit()
-    conn.close()
+@app.route("/bot", methods=['POST'])
+def bot():
+    # O Twilio envia os dados como Form Data, não JSON
+    pergunta_usuario = request.values.get('Body', '').lower()
+    
+    # Processa com a IA
+    resposta_ia = perguntar_ao_gemini(pergunta_usuario)
 
-@app.route("/webhook", methods=['POST'])
-def webhook():
-    texto = request.values.get('Body', '')
-    from_number = request.values.get('From', '')
+    # Prepara a resposta no formato TwiML
     resp = MessagingResponse()
-    msg = resp.message()
+    resp.message(resposta_ia)
 
-    dados = entender_mensagem(texto)
-
-    if dados['categoria'] == "PERGUNTA" and dados['resumo'] == "saudacao":
-        msg.body("🤖 Olá! Tudo bem por aqui 😊\n\nSou o Cunene Conectado. Me fala o problema e o bairro.\nEx: 'Falta água no Naipalala'")
-        return str(resp)
-
-    if dados['categoria'] in ['AGUA', 'SAUDE', 'ESCOLA', 'URGENTE']:
-        salvar_reporte(dados, from_number)
-        msg.body(f"✅ Registo feito!\nCategoria: {dados['categoria']}\nBairro: {dados['bairro'] or 'Não informado'}\n\nObrigado!")
-        return str(resp)
-
-    msg.body("Não entendi. Tenta assim:\n'Falta água no bairro Central'")
     return str(resp)
 
-    if __name__ == "__main__":
-        app.run(debug=True)
+if __name__ == "__main__":
+    # O Render exige que o bot rode na porta 10000 ou na definida pela variável PORT
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
+   
 
