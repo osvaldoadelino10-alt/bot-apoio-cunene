@@ -87,7 +87,7 @@ def enviar_mensagem_telegram(chat_id, texto):
         print("🚨 Falta a credencial TELEGRAM_TOKEN no Render!")
         return
 
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": texto
