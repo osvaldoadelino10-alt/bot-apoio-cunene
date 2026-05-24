@@ -9,7 +9,7 @@ from openai import OpenAI
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # Substituímos a variável do Render pelo Token exato e limpo:
-TELEGRAM_TOKEN = "8322294828:AAEPX903DD5TjlXSBuoxX9X0EoGEzADR6Ls" 
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 # Inicializa OpenAI para usar a infraestrutura da Groq
 client = None
