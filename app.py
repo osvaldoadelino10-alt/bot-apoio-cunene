@@ -7,7 +7,9 @@ from openai import OpenAI
 # 1. VARIÁVEIS DE AMBIENTE (GROQ & TELEGRAM)
 # ==========================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") # Adiciona esta variável no Render
+
+# Substituímos a variável do Render pelo Token exato e limpo:
+TELEGRAM_TOKEN = "8322294828:AAEPX903DD5TjlXSBuoxX9X0EoGEzADR6Ls" 
 
 # Inicializa OpenAI para usar a infraestrutura da Groq
 client = None
@@ -89,7 +91,7 @@ def enviar_mensagem_telegram(chat_id, texto):
     payload = {
         "chat_id": chat_id,
         "text": texto,
-        "parse_mode": "Markdown" # Permite usar o negrito *texto* e itálico _texto_ no Telegram
+        "parse_mode": "Markdown" 
     }
     
     resposta = requests.post(url, json=payload)
@@ -143,22 +145,19 @@ def processar_texto(user_text):
 def home():
     return "Servidor do Bot de Telegram do Cunene Ativo!", 200
 
-# O Telegram envia tudo para esta rota via POST (não precisa da validação GET da Meta)
+# O Telegram envia tudo para esta rota via POST
 @app.route('/telegram', methods=['POST'])
 def receber_mensagens_telegram():
     body = request.get_json()
 
-    # Verifica se a estrutura JSON contém uma mensagem de texto válida
     if "message" in body and "text" in body["message"]:
         chat_id = body["message"]["chat"]["id"]
         texto_recebido = body["message"]["text"]
         
         print(f"📥 Recebido do Telegram (Chat ID {chat_id}): {texto_recebido}")
         
-        # Processa o texto usando os mesmos filtros e IA
         resposta_final = processar_texto(texto_recebido)
         
-        # Envia de volta para o utilizador no Telegram
         enviar_mensagem_telegram(chat_id, resposta_final)
                     
     return jsonify({"status": "ok"}), 200
