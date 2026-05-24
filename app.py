@@ -90,8 +90,9 @@ def enviar_mensagem_telegram(chat_id, texto):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
-        "text": texto,
-        "parse_mode": "Markdown" 
+        "text": texto
+        # Removemos a linha do parse_mode para evitar que o Telegram rejeite as mensagens com asteriscos da Groq
+    }
     }
     
     resposta = requests.post(url, json=payload)
